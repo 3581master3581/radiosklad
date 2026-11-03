@@ -110,6 +110,17 @@ body.rep-open{overflow:hidden}
   .paper{box-shadow:none;margin:0;max-width:none;padding:0}
   .paper tr{break-inside:avoid}
 }
+.thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:var(--bg);border:1px solid var(--ln)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin-bottom:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--ln)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph button{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1;padding:0}
+#viewer{display:none;position:fixed;inset:0;z-index:40;background:#000;flex-direction:column}
+#viewer.on{display:flex}
+#viewer img{flex:1;min-height:0;width:100%;object-fit:contain}
+#viewer .vb{display:flex;align-items:center;justify-content:space-between;padding:calc(8px + env(safe-area-inset-top)) 10px 8px;color:#fff}
+#viewer .vb button,#viewer .vn button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:10px 16px;font-size:18px}
+#viewer .vn{display:flex;justify-content:space-between;padding:10px 10px calc(14px + env(safe-area-inset-bottom))}
 </style>
 </head>
 <body>
@@ -130,8 +141,12 @@ body.rep-open{overflow:hidden}
 </nav>
 <dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
 <div id="report"></div>
+<div id="viewer"><div class="vb"><span id="vCap"></span><button data-v="close">✕</button></div><img id="vImg" alt=""><div class="vn"><button data-v="prev">‹</button><button data-v="next">›</button></div></div>
+<input type="file" id="photoCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="photoGal" accept="image/*" multiple hidden>
 <div id="toast"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
+<input type="file" id="xlsxFile" accept=".xlsx,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden>
 
 <script>
 'use strict';
@@ -156,6 +171,81 @@ const ls = {
 let S = { metals: [], groups: [], items: [] };
 let tab = 'stock', q = '';
 let closed = {}; try { closed = JSON.parse(ls.get('closed') || '{}'); } catch {}
+
+/* ---------- фото (IndexedDB у браузері) ---------- */
+const PH = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('radiosklad', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'id' });
+      r.onsuccess = () => res(this.db = r.result);
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async tx(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('photos', mode); const st = t.objectStore('photos');
+      const out = fn(st); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => rej(t.error);
+    });
+  },
+  put(rec) { return this.tx('readwrite', st => st.put(rec)); },
+  get(id) { return this.tx('readonly', st => st.get(id)); },
+  del(ids) { return ids.length ? this.tx('readwrite', st => ids.forEach(id => st.delete(id))) : Promise.resolve(); },
+  all() { return this.tx('readonly', st => st.getAll()); },
+  urls: new Map(),
+  async url(id, kind = 'thumb') {
+    const k = id + kind; if (this.urls.has(k)) return this.urls.get(k);
+    const r = await this.get(id); if (!r) return '';
+    const u = URL.createObjectURL(r[kind] || r.full); this.urls.set(k, u); return u;
+  },
+};
+function resizeImage(file, max, q) {
+  return new Promise((res, rej) => {
+    const img = new Image(); const u = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+      c.toBlob(b => b ? res(b) : rej(new Error('Не вдалося обробити фото')), 'image/jpeg', q);
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); rej(new Error('Файл не є зображенням')); };
+    img.src = u;
+  });
+}
+async function addPhotos(files) {
+  const ids = [];
+  for (const f of files) {
+    const [full, thumb] = await Promise.all([resizeImage(f, 1600, 0.82), resizeImage(f, 240, 0.7)]);
+    const id = uid(); await PH.put({ id, full, thumb, date: new Date().toISOString() }); ids.push(id);
+  }
+  return ids;
+}
+function fillThumbs(root) {
+  root.querySelectorAll('img[data-ph]').forEach(async im => { im.src = await PH.url(im.dataset.ph, im.dataset.kind || 'thumb'); });
+}
+let vList = [], vIdx = 0;
+async function openViewer(list, idx, cap) {
+  vList = list; vIdx = idx; $('#vCap').textContent = cap || '';
+  $('#viewer').classList.add('on'); await showV();
+}
+async function showV() {
+  $('#vImg').src = await PH.url(vList[vIdx], 'full');
+  $('#viewer .vn').style.visibility = vList.length > 1 ? '' : 'hidden';
+}
+$('#viewer').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-v]'); if (!b) return;
+  if (b.dataset.v === 'close') $('#viewer').classList.remove('on');
+  else { vIdx = (vIdx + (b.dataset.v === 'next' ? 1 : vList.length - 1)) % vList.length; showV(); }
+});
+let tx0 = null;
+$('#vImg').addEventListener('touchstart', e => tx0 = e.touches[0].clientX, { passive: true });
+$('#vImg').addEventListener('touchend', e => {
+  if (tx0 == null || vList.length < 2) return; const dx = e.changedTouches[0].clientX - tx0; tx0 = null;
+  if (Math.abs(dx) > 50) { vIdx = (vIdx + (dx < 0 ? 1 : vList.length - 1)) % vList.length; showV(); }
+});
 
 /* ---------- розрахунки ---------- */
 const metalById = id => S.metals.find(m => m.id === id);
@@ -245,12 +335,16 @@ function vStock() {
   const lastExp = +ls.get('lastExport') || 0;
   const banner = MODE === 'local' && S.items.length && Date.now() - lastExp > 14 * 864e5
     ? `<div class="card" style="background:var(--ac2)" data-act="goMore">⚠️ Дані зберігаються лише в браузері. ${lastExp ? 'Остання копія — ' + new Date(lastExp).toLocaleDateString('uk-UA') : 'Резервної копії ще не було'}. <u>Зробити експорт</u></div>` : '';
-  view.innerHTML = banner + `<div class="search"><input id="q" type="search" placeholder="Пошук за назвою або приміткою…" value="${esc(q)}"></div><div id="list"></div>`;
+  view.innerHTML = banner + `<div class="search"><input id="q" type="search" placeholder="Пошук за назвою або приміткою…" value="${esc(q)}"></div>
+    <label class="chk" style="padding:0 2px 8px"><input type="checkbox" id="onlyStock"${ls.get('onlyStock') ? ' checked' : ''}> Лише в наявності (кількість більше 0)</label><div id="list"></div>`;
   $('#q').addEventListener('input', e => { q = e.target.value; renderList(); });
+  $('#onlyStock').addEventListener('change', e => { e.target.checked ? ls.set('onlyStock', '1') : ls.del('onlyStock'); renderList(); });
   renderList();
 }
 function itemRow(it) {
+  const ph = (it.photos || [])[0];
   return `<div class="item">
+    ${ph ? `<img class="thumb" data-ph="${ph}" data-view="${it.id}" alt="">` : ''}
     <div class="info" data-edit="${it.id}">
       <div class="nm">${esc(it.name)}</div>
       <div class="sub">${money(unitValue(it))}/${esc(it.unit)} · <b>${money(itemSum(it))}</b></div>
@@ -265,11 +359,12 @@ function itemRow(it) {
 function renderList() {
   const list = $('#list'); if (!list) return;
   if (!S.items.length) {
-    list.innerHTML = `<div class="empty">Склад порожній.<br>Натисни <b>+</b>, щоб додати першу позицію.<br><br>Спершу варто вказати ціни у вкладці <b>Метали</b>.</div>`;
+    list.innerHTML = `<div class="empty">Склад порожній.<br>Натисни <b>+</b>, щоб додати позицію вручну,<br>або завантаж прайс з Excel у вкладці <b>Ще</b>.</div>`;
     return;
   }
   const ql = q.trim().toLowerCase();
-  const items = S.items.filter(i => !ql || (i.name + ' ' + (i.note || '')).toLowerCase().includes(ql));
+  const only = !!ls.get('onlyStock');
+  const items = S.items.filter(i => (!ql || (i.name + ' ' + (i.note || '')).toLowerCase().includes(ql)) && (!only || num(i.qty) > 0));
   const groups = [...S.groups, { id: '', name: 'Без групи' }];
   let h = '';
   for (const g of groups) {
@@ -284,6 +379,7 @@ function renderList() {
     h += `</section>`;
   }
   list.innerHTML = h || `<div class="empty">Нічого не знайдено</div>`;
+  fillThumbs(list);
 }
 
 function vPrices() {
@@ -329,6 +425,12 @@ function vMore() {
       <div class="stat"><span>Металів у довіднику</span><b>${S.metals.length}</b></div>
       <div class="stat"><span>Останні зміни</span><b>${S.updatedAt ? new Date(S.updatedAt).toLocaleString('uk-UA') : '—'}</b></div>
     </div>
+    <h3>Прайс (Excel)</h3>
+    <div class="card">
+      <p class="hint" style="margin-top:0">Завантаж таблицю .xlsx з аркушами «Прайс» (позиції та ціни) і «Метали» (ціни металів, необов'язково). Позиції з такою ж назвою оновляться, нові буде додано, кількість на складі збережеться, якщо в таблиці її не вказано.</p>
+      <div class="row"><button class="btn pri grow" data-act="importXlsx">⬆ Завантажити прайс</button></div>
+      <div class="row"><button class="btn grow" data-act="exportXlsx">⬇ Поточний прайс у Excel</button></div>
+    </div>
     <h3>Резервні копії</h3>
     <div class="card">
       <p class="hint" style="margin-top:0">${MODE === 'local'
@@ -336,6 +438,7 @@ function vMore() {
         : 'Сервер сам зберігає щоденні копії в папці <code>data/backups</code> (останні 30 днів). Тут можна зберегти копію вручну.'}
       ${ls.get('lastExport') ? '<br>Остання копія: ' + new Date(+ls.get('lastExport')).toLocaleString('uk-UA') : ''}</p>
       <div class="row"><button class="btn grow" data-act="exportJson">⬇ Експорт JSON</button><button class="btn grow" data-act="importJson">⬆ Імпорт JSON</button></div>
+      <div class="row"><button class="btn grow" data-act="exportJsonPh">⬇ Експорт JSON разом з фото</button></div>
       <div class="row"><button class="btn grow" data-act="exportCsv">⬇ Таблиця CSV (для Excel)</button></div>
     </div>`;
 }
@@ -347,6 +450,8 @@ function openItem(id) {
   isNew = !src;
   editing = src ? JSON.parse(JSON.stringify(src))
     : { id: uid(), name: '', groupId: S.groups[0]?.id || '', unit: 'шт', qty: 0, price: 0, contents: [], note: '' };
+  editing.photos = editing.photos || [];
+  editing._orig = [...editing.photos]; editing._added = [];
   renderForm(); dlg.showModal();
   if (isNew) setTimeout(() => $('#fName')?.focus(), 50);
 }
@@ -363,7 +468,7 @@ function renderForm() {
       <div class="f"><label>Кількість</label><input id="fQty" inputmode="decimal" value="${inp(e.qty)}"></div>
       <div class="f"><label>Одиниця</label><select id="fUnit">${UNITS.map(u => `<option${u === e.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></div>
     </div>
-    <div class="f"><label>Фіксована ціна за 1 <span id="uLbl">${esc(e.unit)}</span>, ₴ (необов'язково)</label>
+    <div class="f"><label>Ціна за 1 <span id="uLbl">${esc(e.unit)}</span> з прайсу, ₴</label>
       <input id="fPrice" inputmode="decimal" placeholder="0" value="${num(e.price) ? inp(e.price) : ''}"></div>
     <div class="cont">
       <div style="font-size:13px;font-weight:600;margin-bottom:6px">Вміст металів на 1 <span class="uLbl2">${esc(e.unit)}</span></div>
@@ -372,7 +477,11 @@ function renderForm() {
         <input style="width:90px" data-ca="${i}" inputmode="decimal" placeholder="0" value="${num(c.amount) ? inp(c.amount) : ''}">
         <button class="ib" data-cdel="${i}" aria-label="Прибрати">✕</button></div>`).join('')}
       <div class="row"><button class="btn grow" data-act="addContent" ${S.metals.length ? '' : 'disabled'}>+ Метал</button></div>
-      <div class="sub" style="margin-top:6px">Кількість металу — в одиницях, вказаних у довіднику (г або кг). Ціна за 1 од. = фіксована ціна + вміст × ціна металу.</div>
+      <div class="sub" style="margin-top:6px">Кількість металу — в одиницях, вказаних у довіднику (г або кг). Ціна за 1 од. = ціна з прайсу + вміст × ціна металу.</div>
+    </div>
+    <div class="f"><label>Фото</label>
+      ${(e.photos || []).length ? `<div class="photos">${e.photos.map((id, i) => `<div class="ph"><img data-ph="${id}" data-pview="${i}" alt=""><button data-pdel="${i}" aria-label="Видалити фото">✕</button></div>`).join('')}</div>` : ''}
+      <div class="row"><button class="btn grow" data-act="photoCam">📷 Камера</button><button class="btn grow" data-act="photoGal">🖼 Галерея</button></div>
     </div>
     <div class="f"><label>Примітка</label><textarea id="fNote" placeholder="Звідки, стан, маркування…">${esc(e.note)}</textarea></div>
     <div class="prev"><span>Ціна за 1 <span class="uLbl3">${esc(e.unit)}</span>: <b id="pUnit"></b></span><span>Сума: <b id="pSum"></b></span></div>
@@ -381,6 +490,7 @@ function renderForm() {
       <button class="btn" data-act="cancel">Скасувати</button><button class="btn pri" data-act="saveItem">Зберегти</button>
     </div>`;
   updatePreview();
+  fillThumbs(dlgBody);
 }
 function collect() {
   const e = editing;
@@ -400,25 +510,43 @@ function updatePreview() {
 dlgBody.addEventListener('input', updatePreview);
 dlgBody.addEventListener('change', updatePreview);
 dlgBody.addEventListener('click', ev => {
+  const pv = ev.target.closest('[data-pview]');
+  if (pv) { openViewer(editing.photos, +pv.dataset.pview, editing.name); return; }
   const t = ev.target.closest('button'); if (!t) return;
   ev.preventDefault();
   const a = t.dataset.act;
+  if (t.dataset.pdel != null) { collect(); editing.photos.splice(+t.dataset.pdel, 1); renderForm(); return; }
+  if (a === 'photoCam' || a === 'photoGal') { collect(); $(a === 'photoCam' ? '#photoCam' : '#photoGal').click(); return; }
   if (t.dataset.cdel != null) { collect(); editing.contents.splice(+t.dataset.cdel, 1); renderForm(); }
   else if (a === 'addContent') { collect(); editing.contents.push({ metalId: S.metals[0].id, amount: 0 }); renderForm(); dlgBody.querySelector(`[data-ca="${editing.contents.length - 1}"]`)?.focus(); }
-  else if (a === 'cancel') dlg.close();
+  else if (a === 'cancel') { PH.del(editing._added.filter(id => !editing._orig.includes(id))); dlg.close(); }
   else if (a === 'delItem') {
     if (!confirm(`Видалити «${editing.name}»?`)) return;
+    PH.del([...new Set([...editing._orig, ...editing._added])]);
     S.items = S.items.filter(i => i.id !== editing.id); save(); dlg.close(); render();
   }
   else if (a === 'saveItem') {
     collect();
     if (!editing.name) { $('#fName').focus(); toast('Вкажи назву'); return; }
+    PH.del([...editing._orig, ...editing._added].filter(id => !editing.photos.includes(id)));
+    delete editing._orig; delete editing._added;
     const idx = S.items.findIndex(i => i.id === editing.id);
     if (idx >= 0) S.items[idx] = editing; else S.items.push(editing);
     if (editing.groupId) delete closed[editing.groupId];
     save(); dlg.close(); render();
   }
 });
+
+for (const sel of ['#photoCam', '#photoGal'])
+  $(sel).addEventListener('change', async ev => {
+    const files = [...ev.target.files]; ev.target.value = ''; if (!files.length || !editing) return;
+    try {
+      toast(files.length > 1 ? `Обробка ${files.length} фото…` : 'Обробка фото…');
+      const ids = await addPhotos(files);
+      editing.photos.push(...ids); editing._added.push(...ids); renderForm();
+    } catch (e) { alert('Помилка фото: ' + e.message); }
+  });
+dlg.addEventListener('cancel', () => { if (editing) PH.del(editing._added.filter(id => !editing._orig.includes(id))); });
 
 /* ---------- події основного екрана ---------- */
 function changeQty(id, delta, abs) {
@@ -427,11 +555,12 @@ function changeQty(id, delta, abs) {
   save(); renderList();
 }
 view.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-tg],[data-edit],[data-inc],[data-dec],[data-mdel],[data-gdel],[data-gup],[data-gdown],[data-act]');
+  const t = ev.target.closest('[data-tg],[data-edit],[data-view],[data-inc],[data-dec],[data-mdel],[data-gdel],[data-gup],[data-gdown],[data-act]');
   if (!t) return;
   const d = t.dataset;
   if (d.tg != null) { closed[d.tg] = !closed[d.tg]; ls.set('closed', JSON.stringify(closed)); renderList(); }
   else if (d.edit) openItem(d.edit);
+  else if (d.view) { const it = S.items.find(i => i.id === d.view); openViewer(it.photos, 0, it.name); }
   else if (d.inc) changeQty(d.inc, 1);
   else if (d.dec) changeQty(d.dec, -1);
   else if (d.mdel) {
@@ -459,7 +588,10 @@ view.addEventListener('click', ev => {
   else if (d.act === 'goMore') { tab = 'more'; render(); }
   else if (d.act === 'exportJson') ls.set('lastExport', Date.now()), download(`radiosklad-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 1), 'application/json');
   else if (d.act === 'exportCsv') exportCsv();
+  else if (d.act === 'exportJsonPh') exportWithPhotos();
   else if (d.act === 'importJson') $('#importFile').click();
+  else if (d.act === 'importXlsx') $('#xlsxFile').click();
+  else if (d.act === 'exportXlsx') exportXlsx();
 });
 view.addEventListener('change', ev => {
   const t = ev.target, d = t.dataset;
@@ -490,12 +622,28 @@ function exportCsv() {
   rows.push(['', 'РАЗОМ', '', '', '', n(total()), '', '']);
   download(`radiosklad-${new Date().toISOString().slice(0, 10)}.csv`, '﻿' + rows.map(r => r.map(c).join(';')).join('\r\n'), 'text/csv');
 }
+const blobToData = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
+const dataToBlob = async d => (await fetch(d)).blob();
+async function exportWithPhotos() {
+  try {
+    toast('Готую файл з фото…');
+    const used = new Set(S.items.flatMap(i => i.photos || []));
+    const photos = {};
+    for (const r of await PH.all()) if (used.has(r.id)) photos[r.id] = { full: await blobToData(r.full), thumb: await blobToData(r.thumb), date: r.date };
+    ls.set('lastExport', Date.now());
+    download(`radiosklad-z-foto-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ ...S, photos }), 'application/json');
+  } catch (e) { alert('Помилка експорту: ' + e.message); }
+}
 $('#importFile').addEventListener('change', async ev => {
   const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
   try {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.metals) || !Array.isArray(d.groups) || !Array.isArray(d.items)) throw new Error('Невірний формат файлу');
     if (!confirm(`Замінити поточні дані даними з файлу?\n(${d.items.length} поз., ${d.groups.length} груп, ${d.metals.length} металів)`)) return;
+    if (d.photos) {
+      for (const [id, r] of Object.entries(d.photos)) await PH.put({ id, full: await dataToBlob(r.full), thumb: await dataToBlob(r.thumb), date: r.date });
+      delete d.photos;
+    }
     S = d; save(); render(); toast('Імпортовано');
   } catch (e) { alert('Помилка імпорту: ' + e.message); }
 });
@@ -669,6 +817,129 @@ $('#report').addEventListener('click', ev => {
     toast(miss ? `Списано. ${miss} поз. уже немає на складі` : 'Списано зі складу');
   }
 });
+
+/* ---------- Excel: імпорт / експорт прайсу ---------- */
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = 'xlsx.full.min.js';
+    sc.onload = res; sc.onerror = () => rej(new Error('Не вдалося завантажити модуль Excel (файл xlsx.full.min.js)'));
+    document.head.appendChild(sc);
+  });
+}
+const norm = v => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[’`ʼ]/g, "'");
+const metalKey = h => norm(String(h).split(/[,(]/)[0]);
+function sheetRows(ws) { return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true, blankrows: false }); }
+function findHeader(rows, must) {
+  for (let r = 0; r < Math.min(rows.length, 15); r++) if (rows[r].some(c => norm(c).startsWith(must))) return r;
+  return -1;
+}
+function parsePriceWorkbook(wb) {
+  const names = wb.SheetNames;
+  const pick = pref => names.find(n => norm(n).startsWith(pref));
+  const metalsName = pick('метал');
+  const priceName = pick('прайс') || names.find(n => n !== metalsName && !norm(n).startsWith('інструк'));
+  const res = { metals: [], items: [], metalCols: [], errors: [] };
+  if (metalsName) {
+    const rows = sheetRows(wb.Sheets[metalsName]); const h = findHeader(rows, 'метал');
+    if (h >= 0) {
+      const hd = rows[h].map(norm);
+      const cN = hd.findIndex(x => x.startsWith('метал')), cU = hd.findIndex(x => x.startsWith('од')), cP = hd.findIndex(x => x.startsWith('цін'));
+      for (const r of rows.slice(h + 1)) {
+        const name = String(r[cN] ?? '').trim(); if (!name) continue;
+        const pr = cP >= 0 ? String(r[cP]).trim() : '';
+        res.metals.push({ name, unit: cU >= 0 && String(r[cU]).trim() ? String(r[cU]).trim() : 'г', price: pr === '' ? null : num(pr) });
+      }
+    }
+  }
+  if (!priceName) { res.errors.push('Не знайдено аркуш з прайсом'); return res; }
+  const rows = sheetRows(wb.Sheets[priceName]); const h = findHeader(rows, 'назва');
+  if (h < 0) { res.errors.push(`На аркуші «${priceName}» не знайдено колонку «Назва»`); return res; }
+  const hd = rows[h];
+  const col = pref => hd.findIndex(x => norm(x).startsWith(pref));
+  const cG = col('груп'), cN = col('назва'), cU = col('од'), cP = col('цін'), cQ = col('кільк'), cNote = col('приміт');
+  const known = new Set([...S.metals.map(m => norm(m.name)), ...res.metals.map(m => norm(m.name))]);
+  hd.forEach((x, i) => { if (![cG, cN, cU, cP, cQ, cNote].includes(i) && String(x).trim() && known.has(metalKey(x))) res.metalCols.push({ i, key: metalKey(x) }); });
+  rows.slice(h + 1).forEach((r, idx) => {
+    const name = String(r[cN] ?? '').trim(); if (!name) return;
+    const unit = cU >= 0 && String(r[cU]).trim() ? String(r[cU]).trim() : 'шт';
+    const qtyRaw = cQ >= 0 ? String(r[cQ]).trim() : '';
+    res.items.push({
+      row: h + idx + 2, group: cG >= 0 ? String(r[cG]).trim() : '', name, unit,
+      price: cP >= 0 && String(r[cP]).trim() !== '' ? num(r[cP]) : null, qty: qtyRaw === '' ? null : Math.max(0, num(qtyRaw)),
+      note: cNote >= 0 ? String(r[cNote]).trim() : null,
+      contents: res.metalCols.map(mc => ({ key: mc.key, amount: num(r[mc.i]) })).filter(c => c.amount > 0),
+    });
+  });
+  return res;
+}
+function applyPrice(p) {
+  const T = JSON.parse(JSON.stringify(S));
+  const st = { mNew: 0, mUpd: 0, gNew: 0, iNew: 0, iUpd: 0 };
+  for (const m of p.metals) {
+    const ex = T.metals.find(x => norm(x.name) === norm(m.name));
+    if (ex) { ex.unit = m.unit; if (m.price != null) { ex.price = m.price; st.mUpd++; } }
+    else { T.metals.push({ id: uid(), name: m.name, unit: m.unit, price: m.price ?? 0 }); st.mNew++; }
+  }
+  const metalId = key => T.metals.find(m => norm(m.name) === key)?.id;
+  const groupId = name => {
+    if (!name) return '';
+    let g = T.groups.find(x => norm(x.name) === norm(name));
+    if (!g) { g = { id: uid(), name }; T.groups.push(g); st.gNew++; }
+    return g.id;
+  };
+  const seen = new Set();
+  for (const r of p.items) {
+    const k = norm(r.name); if (seen.has(k)) continue; seen.add(k);
+    let it = T.items.find(x => norm(x.name) === k);
+    if (!it) { it = { id: uid(), name: r.name, qty: 0, price: 0, contents: [], note: '' }; T.items.push(it); st.iNew++; } else st.iUpd++;
+    it.groupId = groupId(r.group); it.unit = r.unit; if (r.price != null) it.price = r.price;
+    if (r.qty != null) it.qty = r.qty;
+    if (r.note != null && r.note !== '') it.note = r.note;
+    if (p.metalCols.length) it.contents = r.contents.map(c => ({ metalId: metalId(c.key), amount: c.amount })).filter(c => c.metalId);
+  }
+  return { T, st, dup: p.items.length - seen.size };
+}
+$('#xlsxFile').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  try {
+    toast('Читаю таблицю…');
+    await loadXLSX();
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const p = parsePriceWorkbook(wb);
+    if (p.errors.length) throw new Error(p.errors.join('\n'));
+    if (!p.items.length && !p.metals.length) throw new Error('У таблиці немає жодної позиції');
+    const { T, st, dup } = applyPrice(p);
+    const msg = `Файл: ${f.name}\n\n` +
+      `Позиції: нових ${st.iNew}, оновлено ${st.iUpd}\n` +
+      (st.gNew ? `Нових груп: ${st.gNew}\n` : '') +
+      (p.metals.length ? `Метали: нових ${st.mNew}, оновлено цін ${st.mUpd}\n` : '') +
+      (p.metalCols.length ? `Колонки вмісту металів: ${p.metalCols.length}\n` : '') +
+      (dup ? `Повтори назв пропущено: ${dup}\n` : '') + '\nЗастосувати?';
+    if (!confirm(msg)) return;
+    S = T; save(); render(); toast('Прайс завантажено');
+  } catch (e) { alert('Помилка імпорту: ' + e.message); }
+});
+async function exportXlsx() {
+  try {
+    await loadXLSX();
+    const used = S.metals.filter(m => S.items.some(i => (i.contents || []).some(c => c.metalId === m.id)));
+    const head = ['Група', 'Назва', 'Одиниця', 'Ціна за од., ₴', 'Кількість', 'Примітка', ...used.map(m => `${m.name}, ${m.unit}`)];
+    const rows = [head];
+    for (const g of [...S.groups, { id: '', name: '' }])
+      for (const it of S.items.filter(i => groupOf(i) === g.id).sort((a, b) => a.name.localeCompare(b.name, 'uk')))
+        rows.push([g.name, it.name, it.unit, num(it.price), num(it.qty), it.note || '',
+          ...used.map(m => { const c = (it.contents || []).find(x => x.metalId === m.id); return c ? num(c.amount) : ''; })]);
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.aoa_to_sheet(rows);
+    ws1['!cols'] = [{ wch: 24 }, { wch: 30 }, { wch: 9 }, { wch: 14 }, { wch: 10 }, { wch: 28 }, ...used.map(() => ({ wch: 12 }))];
+    const ws2 = XLSX.utils.aoa_to_sheet([['Метал', 'Одиниця', 'Ціна, ₴'], ...S.metals.map(m => [m.name, m.unit, num(m.price)])]);
+    ws2['!cols'] = [{ wch: 20 }, { wch: 9 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Прайс');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Метали');
+    XLSX.writeFile(wb, `radiosklad-prais-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (e) { alert('Помилка експорту: ' + e.message); }
+}
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 load();

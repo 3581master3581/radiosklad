@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d2733">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Радіосклад</title>
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--tx:#18202a;--mu:#6b7684;--ln:#e3e7ec;--ac:#c77d12;--ac2:#fff3df;--ok:#2e9d5b;--er:#d1453b;--hd:#1d2733}
+@media (prefers-color-scheme:dark){:root{--bg:#11161c;--card:#1a2129;--tx:#e8edf2;--mu:#8d98a6;--ln:#2a333e;--ac:#e9a23b;--ac2:#2c2416;--hd:#0c1116}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:5;background:var(--hd);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 12px}
+.top{display:flex;align-items:center;justify-content:space-between}
+.lbl{font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.05em}
+.total{font-size:28px;font-weight:700;color:#ffc061;font-variant-numeric:tabular-nums}
+.sync{width:12px;height:12px;border-radius:50%;background:var(--ok);flex:none}
+.sync.wait{background:#f0b429}.sync.err{background:var(--er)}
+main{padding:12px 12px 140px}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--mu);padding:9px 0 8px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px;line-height:1}
+nav button.on{color:var(--ac);font-weight:600}
+.fab{position:fixed;right:16px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:6;width:58px;height:58px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:32px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+input,select,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:9px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:60px}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--ln);background:var(--card);color:var(--tx);border-radius:10px;padding:10px 14px}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.btn.dan{color:var(--er)}
+.btn.wide{width:100%}
+.search{margin-bottom:10px}
+.grp{background:var(--card);border-radius:14px;margin-bottom:10px;overflow:hidden;border:1px solid var(--ln)}
+.gh{display:flex;align-items:center;gap:8px;padding:12px 14px;user-select:none}
+.gh b{flex:1}
+.chev{color:var(--mu);width:12px}
+.cnt{font-size:12px;color:var(--mu);background:var(--bg);border-radius:20px;padding:1px 8px}
+.gs{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.item{display:flex;align-items:center;gap:8px;padding:10px 12px 10px 14px;border-top:1px solid var(--ln)}
+.info{flex:1;min-width:0}
+.nm{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub{font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
+.sub b{color:var(--tx);font-weight:600}
+.qty{display:flex;align-items:center;gap:4px;flex:none}
+.qty button{width:36px;height:36px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);font-size:20px;line-height:1}
+.qty input{width:62px;text-align:center;padding:7px 4px}
+.u{font-size:12px;color:var(--mu);width:22px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;align-items:center}
+.row+.row{margin-top:8px}
+.grow{flex:1}
+.hint{color:var(--mu);font-size:14px;margin:4px 2px 12px}
+.muted{color:var(--mu)}.pad{padding:12px 14px}
+.empty{text-align:center;color:var(--mu);padding:40px 20px}
+.ib{border:1px solid var(--ln);background:var(--bg);color:var(--tx);border-radius:10px;width:40px;height:40px;flex:none}
+h3{margin:18px 4px 8px;font-size:15px;color:var(--mu);font-weight:600}
+dialog{border:0;border-radius:18px;padding:0;width:min(560px,96vw);max-height:92vh;background:var(--card);color:var(--tx)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dlg{padding:16px}
+.dlg h2{margin:0 0 12px;font-size:19px}
+.f{margin-bottom:10px}
+.f>label{display:block;font-size:13px;color:var(--mu);margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cont{background:var(--ac2);border-radius:12px;padding:10px;margin-bottom:10px}
+.cont .row+.row{margin-top:6px}
+.prev{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;padding:10px 2px;border-top:1px solid var(--ln);margin-top:4px}
+.prev b{color:var(--ac)}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.acts .sp{flex:1}
+#toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222c;color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.stat{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--ln)}
+.stat:first-child{border-top:0}
+.chk{display:flex;align-items:center;gap:10px;padding:6px 0}
+.chk input{width:22px;height:22px;flex:none;accent-color:var(--ac)}
+.ritem{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--ln)}
+.ritem .nm{flex:1;min-width:0}
+.ritem input[type=checkbox]{width:22px;height:22px;flex:none;accent-color:var(--ac)}
+.ritem .rq{width:76px;text-align:center;padding:7px 4px}
+.ritem.off{opacity:.45}
+.rsum{position:sticky;bottom:calc(60px + env(safe-area-inset-bottom));background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:10px 12px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;box-shadow:0 -2px 10px rgba(0,0,0,.08)}
+#report{display:none;position:fixed;inset:0;z-index:30;background:#8a9099;overflow:auto}
+body.rep-open #report{display:block}
+body.rep-open{overflow:hidden}
+.rbar{position:sticky;top:0;display:flex;gap:8px;flex-wrap:wrap;padding:calc(8px + env(safe-area-inset-top)) 10px 8px;background:var(--hd)}
+.rbar .btn{padding:8px 12px}
+.paper{background:#fff;color:#000;max-width:800px;margin:12px auto 40px;padding:22px 18px;font:13px/1.4 Arial,Helvetica,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.paper h1{font-size:19px;text-align:center;margin:0 0 4px}
+.paper .dt{text-align:center;margin-bottom:14px;color:#333}
+.paper .meta{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-bottom:14px}
+.paper .meta b{font-weight:600}
+.paper table{width:100%;border-collapse:collapse;margin-bottom:12px}
+.paper th,.paper td{border:1px solid #777;padding:4px 5px;vertical-align:top}
+.paper th{background:#eee;font-weight:600;text-align:left}
+.paper td.n,.paper th.n{text-align:right;white-space:nowrap}
+.paper tr.gr td{background:#f5f5f5;font-weight:600}
+.paper tr.tot td{font-weight:700}
+.paper .sig{display:flex;justify-content:space-between;gap:20px;margin-top:30px}
+.paper .sig div{flex:1;border-top:1px solid #000;padding-top:3px;font-size:11px;text-align:center}
+.paper .small{font-size:11px;color:#444}
+@media print{
+  @page{size:A4;margin:12mm}
+  html,body{background:#fff!important}
+  body>*:not(#report){display:none!important}
+  #report{position:static;display:block;background:#fff;overflow:visible}
+  .noprint{display:none!important}
+  .paper{box-shadow:none;margin:0;max-width:none;padding:0}
+  .paper tr{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div><div class="lbl">Загальна вартість</div><div id="total" class="total">—</div></div>
+    <span id="sync" class="sync" title="Збережено"></span>
+  </div>
+</header>
+<main id="view"></main>
+<button id="fab" class="fab" aria-label="Додати позицію">+</button>
+<nav id="nav">
+  <button data-tab="stock" class="on"><span>📦</span>Склад</button>
+  <button data-tab="prices"><span>🪙</span>Метали</button>
+  <button data-tab="groups"><span>🗂️</span>Групи</button>
+  <button data-tab="report"><span>📄</span>Звіт</button>
+  <button data-tab="more"><span>⚙️</span>Ще</button>
+</nav>
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+<div id="report"></div>
+<div id="toast"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const view = $('#view'), dlg = $('#dlg'), dlgBody = $('#dlgBody');
+const UNITS = ['шт', 'кг', 'г', 'м', 'пара'];
+const METAL_UNITS = ['г', 'кг', 'шт'];
+
+let seq = 0;
+const uid = () => Date.now().toString(36) + (seq++).toString(36) + Math.random().toString(36).slice(2, 6);
+const num = v => { const n = parseFloat(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => n.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₴';
+const fmt = n => n.toLocaleString('uk-UA', { maximumFractionDigits: 4 });
+const inp = n => String(+num(n).toFixed(6)).replace('.', ',');
+const ls = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+let S = { metals: [], groups: [], items: [] };
+let tab = 'stock', q = '';
+let closed = {}; try { closed = JSON.parse(ls.get('closed') || '{}'); } catch {}
+
+/* ---------- розрахунки ---------- */
+const metalById = id => S.metals.find(m => m.id === id);
+const unitValue = it => num(it.price) + (it.contents || []).reduce((a, c) => {
+  const m = metalById(c.metalId); return a + (m ? num(c.amount) * num(m.price) : 0);
+}, 0);
+const itemSum = it => num(it.qty) * unitValue(it);
+const groupOf = it => S.groups.some(g => g.id === it.groupId) ? it.groupId : '';
+const total = () => S.items.reduce((a, i) => a + itemSum(i), 0);
+
+/* ---------- синхронізація з сервером ---------- */
+let saveTimer = null;
+function setSync(state, msg) {
+  const el = $('#sync'); el.className = 'sync ' + (state === 'ok' ? '' : state);
+  el.title = msg || (state === 'ok' ? 'Збережено' : state === 'wait' ? 'Збереження…' : 'Помилка');
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2400); }
+// Режим: 'server' — є Node-сервер (Termux); 'local' — дані лише в браузері (сайт або GitHub Pages)
+let MODE = ls.get('mode') || '';
+function defaultData() {
+  const m = (name, unit) => ({ id: uid(), name, unit, price: 0 });
+  return {
+    version: 1,
+    metals: [m('Золото', 'г'), m('Срібло', 'г'), m('Паладій', 'г'), m('Платина', 'г'), m('Мідь', 'кг'), m('Латунь', 'кг'), m('Алюміній', 'кг'), m('Нержавіюча сталь', 'кг')],
+    groups: ['Конденсатори', 'Транзистори та мікросхеми', 'Реле та перемикачі', "Роз'єми", 'Плати', 'Кольоровий метал'].map(name => ({ id: uid(), name })),
+    items: [], updatedAt: new Date().toISOString(),
+  };
+}
+async function load() {
+  const cached = ls.get('cache');
+  let r = null;
+  try { r = await fetch('api/data', { cache: 'no-store' }); } catch { r = null; }
+  const isJson = r && (r.headers.get('content-type') || '').includes('json');
+  if (r && r.ok && isJson) {
+    MODE = 'server'; ls.set('mode', 'server');
+    const server = await r.json();
+    if (ls.get('dirty') && cached) { S = JSON.parse(cached); push(); toast('Відправлено незбережені зміни'); }
+    else { S = server; ls.set('cache', JSON.stringify(S)); setSync('ok'); }
+  } else if ((r && !isJson) || (r && r.status === 404) || (!r && MODE !== 'server')) {
+    MODE = 'local'; ls.set('mode', 'local');
+    S = cached ? JSON.parse(cached) : defaultData();
+    ls.set('cache', JSON.stringify(S)); ls.del('dirty');
+    setSync('ok', 'Дані зберігаються в браузері');
+    try { navigator.storage?.persist?.(); } catch {}
+  } else {
+    if (cached) S = JSON.parse(cached);
+    setSync('err', 'Сервер недоступний');
+    toast('Сервер не відповідає — працюю з локальною копією');
+  }
+  render();
+}
+function save() {
+  S.updatedAt = new Date().toISOString();
+  ls.set('cache', JSON.stringify(S)); ls.set('dirty', '1');
+  setSync('wait');
+  clearTimeout(saveTimer); saveTimer = setTimeout(push, 400);
+  renderTotal();
+}
+async function push() {
+  clearTimeout(saveTimer);
+  if (MODE === 'local') { ls.del('dirty'); setSync('ok', 'Дані зберігаються в браузері'); return; }
+  try {
+    const r = await fetch('api/data', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    ls.del('dirty'); setSync('ok');
+  } catch (e) {
+    setSync('err', 'Не збережено на сервері: ' + e.message);
+    saveTimer = setTimeout(push, 5000);
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && ls.get('dirty')) push(); });
+
+/* ---------- рендер ---------- */
+function renderTotal() { $('#total').textContent = money(total()); }
+function render() {
+  renderTotal();
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  $('#fab').style.display = tab === 'stock' ? '' : 'none';
+  if (tab === 'stock') vStock();
+  else if (tab === 'prices') vPrices();
+  else if (tab === 'groups') vGroups();
+  else if (tab === 'report') vReport();
+  else vMore();
+}
+
+function vStock() {
+  const lastExp = +ls.get('lastExport') || 0;
+  const banner = MODE === 'local' && S.items.length && Date.now() - lastExp > 14 * 864e5
+    ? `<div class="card" style="background:var(--ac2)" data-act="goMore">⚠️ Дані зберігаються лише в браузері. ${lastExp ? 'Остання копія — ' + new Date(lastExp).toLocaleDateString('uk-UA') : 'Резервної копії ще не було'}. <u>Зробити експорт</u></div>` : '';
+  view.innerHTML = banner + `<div class="search"><input id="q" type="search" placeholder="Пошук за назвою або приміткою…" value="${esc(q)}"></div><div id="list"></div>`;
+  $('#q').addEventListener('input', e => { q = e.target.value; renderList(); });
+  renderList();
+}
+function itemRow(it) {
+  return `<div class="item">
+    <div class="info" data-edit="${it.id}">
+      <div class="nm">${esc(it.name)}</div>
+      <div class="sub">${money(unitValue(it))}/${esc(it.unit)} · <b>${money(itemSum(it))}</b></div>
+    </div>
+    <div class="qty">
+      <button data-dec="${it.id}" aria-label="Менше">−</button>
+      <input data-qty="${it.id}" inputmode="decimal" value="${inp(it.qty)}">
+      <span class="u">${esc(it.unit)}</span>
+      <button data-inc="${it.id}" aria-label="Більше">+</button>
+    </div></div>`;
+}
+function renderList() {
+  const list = $('#list'); if (!list) return;
+  if (!S.items.length) {
+    list.innerHTML = `<div class="empty">Склад порожній.<br>Натисни <b>+</b>, щоб додати першу позицію.<br><br>Спершу варто вказати ціни у вкладці <b>Метали</b>.</div>`;
+    return;
+  }
+  const ql = q.trim().toLowerCase();
+  const items = S.items.filter(i => !ql || (i.name + ' ' + (i.note || '')).toLowerCase().includes(ql));
+  const groups = [...S.groups, { id: '', name: 'Без групи' }];
+  let h = '';
+  for (const g of groups) {
+    const its = items.filter(i => groupOf(i) === g.id).sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+    if (!its.length) continue; // порожні групи не показуємо
+    const isOpen = ql || !closed[g.id];
+    const sum = its.reduce((a, i) => a + itemSum(i), 0);
+    h += `<section class="grp"><div class="gh" data-tg="${g.id}">
+      <span class="chev">${isOpen ? '▾' : '▸'}</span><b>${esc(g.name)}</b>
+      <span class="cnt">${its.length}</span><span class="gs">${money(sum)}</span></div>`;
+    if (isOpen) h += its.length ? its.map(itemRow).join('') : `<div class="muted pad">Порожньо</div>`;
+    h += `</section>`;
+  }
+  list.innerHTML = h || `<div class="empty">Нічого не знайдено</div>`;
+}
+
+function vPrices() {
+  const used = {};
+  for (const it of S.items) for (const c of it.contents || []) used[c.metalId] = (used[c.metalId] || 0) + num(it.qty) * num(c.amount);
+  let h = `<p class="hint">Ціна за одиницю металу. Змінюєш тут — перераховуються всі позиції, де вказано вміст цього металу.</p>`;
+  for (const m of S.metals) {
+    const amt = used[m.id] || 0;
+    h += `<div class="card">
+      <div class="row"><input class="grow" data-mname="${m.id}" value="${esc(m.name)}"><button class="ib" data-mdel="${m.id}" aria-label="Видалити">🗑</button></div>
+      <div class="row"><span class="muted" style="white-space:nowrap">₴ за</span>
+        <select data-munit="${m.id}" style="width:80px">${METAL_UNITS.map(u => `<option${u === m.unit ? ' selected' : ''}>${u}</option>`).join('')}</select>
+        <input class="grow" data-mprice="${m.id}" inputmode="decimal" placeholder="0" value="${num(m.price) ? inp(m.price) : ''}"></div>
+      <div class="sub" style="margin-top:8px">У запасі: <b>${fmt(amt)} ${esc(m.unit)}</b> · ${money(amt * num(m.price))}</div>
+    </div>`;
+  }
+  h += `<button class="btn wide" data-act="addMetal">+ Додати метал</button>`;
+  view.innerHTML = h;
+}
+
+function vGroups() {
+  let h = `<p class="hint">Групи для розбивки складу. Порядок тут = порядок на вкладці «Склад».</p>`;
+  S.groups.forEach((g, idx) => {
+    const its = S.items.filter(i => i.groupId === g.id);
+    h += `<div class="card">
+      <div class="row"><input class="grow" data-gname="${g.id}" value="${esc(g.name)}">
+        <button class="ib" data-gup="${idx}" ${idx ? '' : 'disabled'} aria-label="Вгору">↑</button>
+        <button class="ib" data-gdown="${idx}" ${idx < S.groups.length - 1 ? '' : 'disabled'} aria-label="Вниз">↓</button>
+        <button class="ib" data-gdel="${g.id}" aria-label="Видалити">🗑</button></div>
+      <div class="sub" style="margin-top:6px">${its.length} поз. · ${money(its.reduce((a, i) => a + itemSum(i), 0))}</div>
+    </div>`;
+  });
+  h += `<button class="btn wide" data-act="addGroup">+ Додати групу</button>`;
+  view.innerHTML = h;
+}
+
+function vMore() {
+  const pcs = S.items.length;
+  view.innerHTML = `
+    <div class="card">
+      <div class="stat"><span>Позицій</span><b>${pcs}</b></div>
+      <div class="stat"><span>Груп</span><b>${S.groups.length}</b></div>
+      <div class="stat"><span>Металів у довіднику</span><b>${S.metals.length}</b></div>
+      <div class="stat"><span>Останні зміни</span><b>${S.updatedAt ? new Date(S.updatedAt).toLocaleString('uk-UA') : '—'}</b></div>
+    </div>
+    <h3>Резервні копії</h3>
+    <div class="card">
+      <p class="hint" style="margin-top:0">${MODE === 'local'
+        ? 'Дані зберігаються лише в браузері на цьому телефоні. Очищення даних Chrome або видалення ярлика може їх стерти, тому регулярно роби експорт JSON і зберігай файл (наприклад, на Google Диск).'
+        : 'Сервер сам зберігає щоденні копії в папці <code>data/backups</code> (останні 30 днів). Тут можна зберегти копію вручну.'}
+      ${ls.get('lastExport') ? '<br>Остання копія: ' + new Date(+ls.get('lastExport')).toLocaleString('uk-UA') : ''}</p>
+      <div class="row"><button class="btn grow" data-act="exportJson">⬇ Експорт JSON</button><button class="btn grow" data-act="importJson">⬆ Імпорт JSON</button></div>
+      <div class="row"><button class="btn grow" data-act="exportCsv">⬇ Таблиця CSV (для Excel)</button></div>
+    </div>`;
+}
+
+/* ---------- форма позиції ---------- */
+let editing = null, isNew = false;
+function openItem(id) {
+  const src = id && S.items.find(i => i.id === id);
+  isNew = !src;
+  editing = src ? JSON.parse(JSON.stringify(src))
+    : { id: uid(), name: '', groupId: S.groups[0]?.id || '', unit: 'шт', qty: 0, price: 0, contents: [], note: '' };
+  renderForm(); dlg.showModal();
+  if (isNew) setTimeout(() => $('#fName')?.focus(), 50);
+}
+function renderForm() {
+  const e = editing;
+  const metalOpts = sel => S.metals.map(m => `<option value="${m.id}"${m.id === sel ? ' selected' : ''}>${esc(m.name)} (${esc(m.unit)})</option>`).join('');
+  dlgBody.innerHTML = `
+    <h2>${isNew ? 'Нова позиція' : 'Редагування'}</h2>
+    <div class="f"><label>Назва</label><input id="fName" value="${esc(e.name)}" placeholder="Напр. КМ-5 Н90"></div>
+    <div class="f"><label>Група</label><select id="fGroup">
+      ${S.groups.map(g => `<option value="${g.id}"${g.id === e.groupId ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}
+      <option value=""${groupOf(e) === '' ? ' selected' : ''}>Без групи</option></select></div>
+    <div class="two">
+      <div class="f"><label>Кількість</label><input id="fQty" inputmode="decimal" value="${inp(e.qty)}"></div>
+      <div class="f"><label>Одиниця</label><select id="fUnit">${UNITS.map(u => `<option${u === e.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></div>
+    </div>
+    <div class="f"><label>Фіксована ціна за 1 <span id="uLbl">${esc(e.unit)}</span>, ₴ (необов'язково)</label>
+      <input id="fPrice" inputmode="decimal" placeholder="0" value="${num(e.price) ? inp(e.price) : ''}"></div>
+    <div class="cont">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Вміст металів на 1 <span class="uLbl2">${esc(e.unit)}</span></div>
+      ${(e.contents || []).map((c, i) => `<div class="row">
+        <select class="grow" data-cm="${i}">${metalOpts(c.metalId)}</select>
+        <input style="width:90px" data-ca="${i}" inputmode="decimal" placeholder="0" value="${num(c.amount) ? inp(c.amount) : ''}">
+        <button class="ib" data-cdel="${i}" aria-label="Прибрати">✕</button></div>`).join('')}
+      <div class="row"><button class="btn grow" data-act="addContent" ${S.metals.length ? '' : 'disabled'}>+ Метал</button></div>
+      <div class="sub" style="margin-top:6px">Кількість металу — в одиницях, вказаних у довіднику (г або кг). Ціна за 1 од. = фіксована ціна + вміст × ціна металу.</div>
+    </div>
+    <div class="f"><label>Примітка</label><textarea id="fNote" placeholder="Звідки, стан, маркування…">${esc(e.note)}</textarea></div>
+    <div class="prev"><span>Ціна за 1 <span class="uLbl3">${esc(e.unit)}</span>: <b id="pUnit"></b></span><span>Сума: <b id="pSum"></b></span></div>
+    <div class="acts">
+      ${isNew ? '' : '<button class="btn dan" data-act="delItem">Видалити</button>'}<span class="sp"></span>
+      <button class="btn" data-act="cancel">Скасувати</button><button class="btn pri" data-act="saveItem">Зберегти</button>
+    </div>`;
+  updatePreview();
+}
+function collect() {
+  const e = editing;
+  e.name = $('#fName').value.trim(); e.groupId = $('#fGroup').value; e.unit = $('#fUnit').value;
+  e.qty = Math.max(0, num($('#fQty').value)); e.price = Math.max(0, num($('#fPrice').value)); e.note = $('#fNote').value;
+  e.contents = (e.contents || []).map((c, i) => ({
+    metalId: dlgBody.querySelector(`[data-cm="${i}"]`)?.value ?? c.metalId,
+    amount: Math.max(0, num(dlgBody.querySelector(`[data-ca="${i}"]`)?.value)),
+  }));
+}
+function updatePreview() {
+  collect();
+  $('#pUnit').textContent = money(unitValue(editing));
+  $('#pSum').textContent = money(itemSum(editing));
+  dlgBody.querySelectorAll('#uLbl,.uLbl2,.uLbl3').forEach(el => el.textContent = editing.unit);
+}
+dlgBody.addEventListener('input', updatePreview);
+dlgBody.addEventListener('change', updatePreview);
+dlgBody.addEventListener('click', ev => {
+  const t = ev.target.closest('button'); if (!t) return;
+  ev.preventDefault();
+  const a = t.dataset.act;
+  if (t.dataset.cdel != null) { collect(); editing.contents.splice(+t.dataset.cdel, 1); renderForm(); }
+  else if (a === 'addContent') { collect(); editing.contents.push({ metalId: S.metals[0].id, amount: 0 }); renderForm(); dlgBody.querySelector(`[data-ca="${editing.contents.length - 1}"]`)?.focus(); }
+  else if (a === 'cancel') dlg.close();
+  else if (a === 'delItem') {
+    if (!confirm(`Видалити «${editing.name}»?`)) return;
+    S.items = S.items.filter(i => i.id !== editing.id); save(); dlg.close(); render();
+  }
+  else if (a === 'saveItem') {
+    collect();
+    if (!editing.name) { $('#fName').focus(); toast('Вкажи назву'); return; }
+    const idx = S.items.findIndex(i => i.id === editing.id);
+    if (idx >= 0) S.items[idx] = editing; else S.items.push(editing);
+    if (editing.groupId) delete closed[editing.groupId];
+    save(); dlg.close(); render();
+  }
+});
+
+/* ---------- події основного екрана ---------- */
+function changeQty(id, delta, abs) {
+  const it = S.items.find(i => i.id === id); if (!it) return;
+  it.qty = Math.max(0, +(abs != null ? abs : num(it.qty) + delta).toFixed(6));
+  save(); renderList();
+}
+view.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-tg],[data-edit],[data-inc],[data-dec],[data-mdel],[data-gdel],[data-gup],[data-gdown],[data-act]');
+  if (!t) return;
+  const d = t.dataset;
+  if (d.tg != null) { closed[d.tg] = !closed[d.tg]; ls.set('closed', JSON.stringify(closed)); renderList(); }
+  else if (d.edit) openItem(d.edit);
+  else if (d.inc) changeQty(d.inc, 1);
+  else if (d.dec) changeQty(d.dec, -1);
+  else if (d.mdel) {
+    const m = metalById(d.mdel);
+    const n = S.items.filter(i => (i.contents || []).some(c => c.metalId === m.id)).length;
+    if (!confirm(`Видалити «${m.name}»?` + (n ? `\nВін використовується в ${n} поз. — там вміст цього металу буде прибрано.` : ''))) return;
+    S.metals = S.metals.filter(x => x.id !== m.id);
+    S.items.forEach(i => i.contents = (i.contents || []).filter(c => c.metalId !== m.id));
+    save(); render();
+  }
+  else if (d.gdel) {
+    const g = S.groups.find(x => x.id === d.gdel);
+    const n = S.items.filter(i => i.groupId === g.id).length;
+    if (!confirm(`Видалити групу «${g.name}»?` + (n ? `\n${n} поз. перейдуть у «Без групи».` : ''))) return;
+    S.groups = S.groups.filter(x => x.id !== g.id);
+    S.items.forEach(i => { if (i.groupId === g.id) i.groupId = ''; });
+    save(); render();
+  }
+  else if (d.gup != null || d.gdown != null) {
+    const i = +(d.gup ?? d.gdown), j = d.gup != null ? i - 1 : i + 1;
+    [S.groups[i], S.groups[j]] = [S.groups[j], S.groups[i]]; save(); render();
+  }
+  else if (d.act === 'addMetal') { S.metals.push({ id: uid(), name: 'Новий метал', unit: 'г', price: 0 }); save(); render(); view.querySelector(`[data-mname="${S.metals.at(-1).id}"]`).select(); }
+  else if (d.act === 'addGroup') { S.groups.push({ id: uid(), name: 'Нова група' }); save(); render(); view.querySelector(`[data-gname="${S.groups.at(-1).id}"]`).select(); }
+  else if (d.act === 'goMore') { tab = 'more'; render(); }
+  else if (d.act === 'exportJson') ls.set('lastExport', Date.now()), download(`radiosklad-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 1), 'application/json');
+  else if (d.act === 'exportCsv') exportCsv();
+  else if (d.act === 'importJson') $('#importFile').click();
+});
+view.addEventListener('change', ev => {
+  const t = ev.target, d = t.dataset;
+  if (d.qty) changeQty(d.qty, 0, num(t.value));
+  else if (d.mname) { metalById(d.mname).name = t.value.trim() || 'Без назви'; save(); }
+  else if (d.munit) { metalById(d.munit).unit = t.value; save(); render(); }
+  else if (d.mprice) { metalById(d.mprice).price = Math.max(0, num(t.value)); save(); render(); }
+  else if (d.gname) { S.groups.find(g => g.id === d.gname).name = t.value.trim() || 'Без назви'; save(); }
+});
+view.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('input')) ev.target.blur(); });
+$('#nav').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) { tab = b.dataset.tab; render(); window.scrollTo(0, 0); } });
+$('#fab').addEventListener('click', () => openItem(null));
+
+/* ---------- експорт / імпорт ---------- */
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportCsv() {
+  const c = v => `"${String(v).replace(/"/g, '""')}"`;
+  const n = v => String(+num(v).toFixed(4)).replace('.', ',');
+  const rows = [['Група', 'Назва', 'Кількість', 'Од.', 'Ціна за од., ₴', 'Сума, ₴', 'Вміст металів', 'Примітка']];
+  for (const g of [...S.groups, { id: '', name: 'Без групи' }])
+    for (const it of S.items.filter(i => groupOf(i) === g.id))
+      rows.push([g.name, it.name, n(it.qty), it.unit, n(unitValue(it)), n(itemSum(it)),
+        (it.contents || []).map(x => { const m = metalById(x.metalId); return m ? `${m.name} ${n(x.amount)} ${m.unit}` : ''; }).filter(Boolean).join('; '), it.note || '']);
+  rows.push(['', 'РАЗОМ', '', '', '', n(total()), '', '']);
+  download(`radiosklad-${new Date().toISOString().slice(0, 10)}.csv`, '﻿' + rows.map(r => r.map(c).join(';')).join('\r\n'), 'text/csv');
+}
+$('#importFile').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.metals) || !Array.isArray(d.groups) || !Array.isArray(d.items)) throw new Error('Невірний формат файлу');
+    if (!confirm(`Замінити поточні дані даними з файлу?\n(${d.items.length} поз., ${d.groups.length} груп, ${d.metals.length} металів)`)) return;
+    S = d; save(); render(); toast('Імпортовано');
+  } catch (e) { alert('Помилка імпорту: ' + e.message); }
+});
+
+/* ---------- звіт / опис вкладення ---------- */
+const TITLES = ['Опис вкладення', 'Звіт про наявність', 'Накладна'];
+let rep = null;
+function repPrefs() { try { return JSON.parse(ls.get('repPrefs') || '{}'); } catch { return {}; } }
+function setRepPref(k, v) { const p = repPrefs(); p[k] = v; ls.set('repPrefs', JSON.stringify(p)); }
+function repInit() {
+  rep = { on: {}, q: {}, to: '', ttn: '', note: '' };
+  for (const i of S.items) { rep.q[i.id] = num(i.qty); if (num(i.qty) > 0) rep.on[i.id] = true; }
+}
+function repLines() {
+  const lines = [];
+  for (const g of [...S.groups, { id: '', name: 'Без групи' }])
+    for (const it of S.items.filter(i => groupOf(i) === g.id).sort((a, b) => a.name.localeCompare(b.name, 'uk'))) {
+      const q = num(rep.q[it.id]);
+      if (!rep.on[it.id] || q <= 0) continue;
+      const pr = unitValue(it);
+      lines.push({
+        itemId: it.id, group: g.name, name: it.name, unit: it.unit, qty: q, price: pr, sum: q * pr, note: it.note || '',
+        metals: (it.contents || []).map(c => { const m = metalById(c.metalId); return m ? { name: m.name, unit: m.unit, amount: num(c.amount) * q } : null; }).filter(x => x && x.amount > 0),
+      });
+    }
+  return lines;
+}
+function updateRepSum() {
+  const l = repLines(); const el = $('#rSumTxt');
+  if (el) el.innerHTML = `${l.length} поз. · <b>${money(l.reduce((a, x) => a + x.sum, 0))}</b>`;
+}
+function vReport() {
+  if (!rep) repInit();
+  for (const i of S.items) if (!(i.id in rep.q)) rep.q[i.id] = num(i.qty);
+  const p = repPrefs();
+  let h = `<div class="card">
+    <div class="f"><label>Документ</label><select data-rp="title">${TITLES.map(t => `<option${t === (p.title || TITLES[0]) ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="f"><label>Відправник</label><input data-rp="from" value="${esc(p.from || '')}" placeholder="ПІБ, телефон"></div>
+    <div class="f"><label>Отримувач</label><input data-rf="to" value="${esc(rep.to)}" placeholder="ПІБ, місто, відділення"></div>
+    <div class="f"><label>Номер ТТН</label><input data-rf="ttn" value="${esc(rep.ttn)}" inputmode="numeric"></div>
+    <div class="f"><label>Примітка</label><textarea data-rf="note">${esc(rep.note)}</textarea></div>
+    <label class="chk"><input type="checkbox" data-rp="prices"${p.prices !== false ? ' checked' : ''}> Показувати ціни та суми</label>
+    <label class="chk"><input type="checkbox" data-rp="metals"${p.metals ? ' checked' : ''}> Показувати вміст металів</label>
+  </div>
+  <h3>Що йде в посилку</h3>
+  <div class="row" style="margin-bottom:10px"><button class="btn grow" data-act="rAll">Вибрати все</button><button class="btn grow" data-act="rNone">Зняти все</button><button class="btn" data-act="rReset" title="Скинути кількості до складських">↺</button></div>`;
+  if (!S.items.length) h += `<div class="empty">Склад порожній</div>`;
+  for (const g of [...S.groups, { id: '', name: 'Без групи' }]) {
+    const its = S.items.filter(i => groupOf(i) === g.id).sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+    if (!its.length) continue;
+    h += `<section class="grp"><div class="gh"><b>${esc(g.name)}</b></div>` + its.map(it => `
+      <div class="ritem${rep.on[it.id] ? '' : ' off'}" data-ritem="${it.id}">
+        <label class="nm" style="display:flex;align-items:center;gap:10px"><input type="checkbox" data-rsel="${it.id}"${rep.on[it.id] ? ' checked' : ''}>
+        <span style="min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</span><span class="sub">на складі ${fmt(num(it.qty))} ${esc(it.unit)}</span></span></label>
+        <input class="rq" data-rq="${it.id}" inputmode="decimal" value="${inp(rep.q[it.id])}"><span class="u">${esc(it.unit)}</span>
+      </div>`).join('') + `</section>`;
+  }
+  h += `<div class="rsum"><span id="rSumTxt"></span><button class="btn pri" data-act="rMake">📄 Сформувати</button></div>`;
+  const hist = S.reports || [];
+  if (hist.length) {
+    h += `<h3>Історія звітів</h3>` + hist.map(r => `<div class="card"><div class="row">
+      <div class="grow" data-ropen="${r.id}"><b>№${r.no}</b> · ${new Date(r.date).toLocaleDateString('uk-UA')} · ${esc(r.title)}${r.writtenOff ? ' · <span class="muted">списано</span>' : ''}
+        <div class="sub">${esc(r.to || 'без отримувача')}${r.ttn ? ' · ТТН ' + esc(r.ttn) : ''} · ${r.lines.length} поз. · ${money(r.total)}</div></div>
+      <button class="ib" data-rdel="${r.id}" aria-label="Видалити">🗑</button></div></div>`).join('');
+  }
+  view.innerHTML = h;
+  updateRepSum();
+}
+view.addEventListener('input', ev => {
+  const d = ev.target.dataset;
+  if (d.rf) rep[d.rf] = ev.target.value;
+  else if (d.rp && ev.target.type !== 'checkbox') setRepPref(d.rp, ev.target.value);
+  else if (d.rq) { rep.q[d.rq] = Math.max(0, num(ev.target.value)); if (num(ev.target.value) > 0 && !rep.on[d.rq]) { rep.on[d.rq] = true; const r = view.querySelector(`[data-ritem="${d.rq}"]`); r.classList.remove('off'); r.querySelector('[data-rsel]').checked = true; } updateRepSum(); }
+});
+view.addEventListener('change', ev => {
+  const d = ev.target.dataset;
+  if (d.rp && ev.target.type === 'checkbox') setRepPref(d.rp, ev.target.checked);
+  else if (d.rp) setRepPref(d.rp, ev.target.value);
+  else if (d.rsel) { rep.on[d.rsel] = ev.target.checked; ev.target.closest('.ritem').classList.toggle('off', !ev.target.checked); updateRepSum(); }
+});
+view.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act^="r"],[data-ropen],[data-rdel]'); if (!t) return;
+  const d = t.dataset;
+  if (d.act === 'rAll') { S.items.forEach(i => { if (num(rep.q[i.id]) > 0) rep.on[i.id] = true; }); vReport(); }
+  else if (d.act === 'rNone') { rep.on = {}; vReport(); }
+  else if (d.act === 'rReset') { repInit(); vReport(); }
+  else if (d.act === 'rMake') {
+    const lines = repLines();
+    if (!lines.length) { toast('Не вибрано жодної позиції'); return; }
+    const p = repPrefs();
+    S.reportSeq = (S.reportSeq || 0) + 1;
+    const r = { id: uid(), no: S.reportSeq, date: new Date().toISOString(), title: p.title || TITLES[0], from: p.from || '',
+      to: rep.to, ttn: rep.ttn, note: rep.note, prices: p.prices !== false, metals: !!p.metals,
+      lines, total: lines.reduce((a, x) => a + x.sum, 0), writtenOff: false };
+    S.reports = [r, ...(S.reports || [])].slice(0, 200);
+    save(); showReport(r);
+  }
+  else if (d.ropen) showReport(S.reports.find(r => r.id === d.ropen));
+  else if (d.rdel) {
+    if (!confirm('Видалити звіт з історії? (склад не зміниться)')) return;
+    S.reports = S.reports.filter(r => r.id !== d.rdel); save(); vReport();
+  }
+});
+
+function reportHtml(r) {
+  const n = v => fmt(v);
+  const cols = r.prices ? 6 : 4;
+  let rows = '', i = 0, lastG = null;
+  const groupCount = new Set(r.lines.map(l => l.group)).size;
+  for (const l of r.lines) {
+    if (groupCount > 1 && l.group !== lastG) {
+      lastG = l.group;
+      const gs = r.lines.filter(x => x.group === l.group).reduce((a, x) => a + x.sum, 0);
+      rows += `<tr class="gr"><td colspan="${r.prices ? cols - 1 : cols}">${esc(l.group)}</td>${r.prices ? `<td class="n">${money(gs)}</td>` : ''}</tr>`;
+    }
+    rows += `<tr><td class="n">${++i}</td><td>${esc(l.name)}${r.metals && l.metals.length ? `<div class="small">${l.metals.map(m => `${esc(m.name)} ${n(m.amount)} ${esc(m.unit)}`).join('; ')}</div>` : ''}</td>
+      <td class="n">${n(l.qty)}</td><td>${esc(l.unit)}</td>${r.prices ? `<td class="n">${money(l.price)}</td><td class="n">${money(l.sum)}</td>` : ''}</tr>`;
+  }
+  const byUnit = {};
+  r.lines.forEach(l => byUnit[l.unit] = (byUnit[l.unit] || 0) + l.qty);
+  const qtyTxt = Object.entries(byUnit).map(([u, q]) => `${n(q)} ${esc(u)}`).join(', ');
+  let metalsTbl = '';
+  if (r.metals) {
+    const agg = {};
+    r.lines.forEach(l => l.metals.forEach(m => { const k = m.name + '|' + m.unit; agg[k] = (agg[k] || 0) + m.amount; }));
+    const ks = Object.keys(agg);
+    if (ks.length) metalsTbl = `<table><tr><th>Метал (орієнтовний вміст)</th><th class="n">Кількість</th></tr>${ks.map(k => { const [nm, u] = k.split('|'); return `<tr><td>${esc(nm)}</td><td class="n">${n(agg[k])} ${esc(u)}</td></tr>`; }).join('')}</table>`;
+  }
+  const meta = [['Відправник', r.from], ['Отримувач', r.to], ['ТТН', r.ttn]].filter(x => x[1]);
+  return `<div class="paper">
+    <h1>${esc(r.title)} № ${r.no}</h1>
+    <div class="dt">від ${new Date(r.date).toLocaleDateString('uk-UA', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+    ${meta.length ? `<div class="meta">${meta.map(([k, v]) => `<b>${k}:</b><span>${esc(v)}</span>`).join('')}</div>` : ''}
+    <table>
+      <tr><th class="n">№</th><th>Найменування</th><th class="n">К-сть</th><th>Од.</th>${r.prices ? '<th class="n">Ціна за од.</th><th class="n">Сума</th>' : ''}</tr>
+      ${rows}
+      <tr class="tot"><td colspan="${r.prices ? cols - 1 : 2}">Разом: ${r.lines.length} найменувань</td>${r.prices ? `<td class="n">${money(r.total)}</td>` : `<td colspan="2" class="n">${qtyTxt}</td>`}</tr>
+    </table>
+    ${r.prices ? `<div>Загальна кількість: ${qtyTxt}</div><div style="margin-bottom:12px">Загальна сума: <b>${money(r.total)}</b></div>` : ''}
+    ${metalsTbl}
+    ${r.note ? `<div style="margin-bottom:12px"><b>Примітка:</b> ${esc(r.note).replace(/\n/g, '<br>')}</div>` : ''}
+    <div class="sig"><div>Відправник (підпис)</div><div>Отримувач (підпис)</div></div>
+  </div>`;
+}
+let curReport = null;
+function showReport(r) {
+  curReport = r;
+  $('#report').innerHTML = `<div class="rbar noprint">
+      <button class="btn pri" data-ract="print">🖨 Друк / PDF</button>
+      ${r.writtenOff ? '<span class="btn" style="opacity:.6">✓ Списано</span>' : '<button class="btn" data-ract="writeoff">Списати зі складу</button>'}
+      <span style="flex:1"></span><button class="btn" data-ract="close">✕</button></div>${reportHtml(r)}`;
+  document.body.classList.add('rep-open');
+  $('#report').scrollTop = 0;
+}
+$('#report').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-ract]'); if (!b) return;
+  const a = b.dataset.ract, r = curReport;
+  if (a === 'close') { document.body.classList.remove('rep-open'); render(); }
+  else if (a === 'print') {
+    const t = document.title; document.title = `${r.title} №${r.no}${r.to ? ' — ' + r.to : ''}`;
+    window.print(); setTimeout(() => document.title = t, 1000);
+  }
+  else if (a === 'writeoff') {
+    if (!confirm(`Зменшити залишки на складі на кількості зі звіту №${r.no}?`)) return;
+    let miss = 0;
+    for (const l of r.lines) {
+      const it = S.items.find(i => i.id === l.itemId);
+      if (it) it.qty = Math.max(0, +(num(it.qty) - l.qty).toFixed(6)); else miss++;
+    }
+    r.writtenOff = true; rep = null; save(); showReport(r);
+    toast(miss ? `Списано. ${miss} поз. уже немає на складі` : 'Списано зі складу');
+  }
+});
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+load();
+</script>
+</body>
+</html>
